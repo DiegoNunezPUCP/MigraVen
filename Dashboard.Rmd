@@ -1,0 +1,950 @@
+---
+title: "El caso peruano en el contexto del éxodo venezolano: Un enfoque cuantitativo"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    css: estilo.css
+    social: 
+    navbar:
+  
+        - { icon: "fa-twitter", href: "https://x.com/socialespucp?s=11&t=cFv1NlDqo3qThlGPpkoMTw", align: right}
+        - { icon: "fa-linkedin", href: "https://www.linkedin.com/in/sebastian-fabio-bueno-hurtado-b141bb363/", align: right}
+---
+
+```{r setup, include=FALSE}
+rm(list = ls()) 
+library(flexdashboard)
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(rio)
+library(ggplot2)
+library(scales)
+library(sf)
+library(ggcorrplot)
+library(googlesheets4)
+library(polycor)
+library(magrittr)
+library(kableExtra)
+library(MASS)
+library(DescTools)
+library(dplyr)
+library(AER)
+library (DHARMa)
+library(psych)
+linkToData='https://docs.google.com/spreadsheets/d/e/2PACX-1vTwScyGykpaesacuxEhi3HVKg2snm_MYRrgwj1AI7VnohZ7rSx_oBDddBX1kFJXbvNgOdq8oqz9EzPc/pub?output=csv'
+migra=read.csv(linkToData)
+
+migracion <- import("Mapas.xlsx")
+```
+
+Visualizaciones {data-icon="fa-signal"}
+===================================== 
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### **Mapa mundial de los migrantes venezolanos 2018**
+```{r}
+# Verificar y cargar datos
+if (!file.exists("Mapas.xlsx")) {
+  stop("El archivo Mapas.xlsx no se encuentra. Asegúrate de que esté en el directorio correcto.")
+}
+migracion <- import("Mapas.xlsx")
+if (!("venezuela_migrantes" %in% colnames(migracion))) {
+  stop("La columna 'venezuela_migrantes' no está en el archivo Mapas.xlsx.")
+}
+migracion <- migracion %>%
+  mutate(country = case_when(
+    country == "EEUU" ~ "United States of America",
+    country == "Perú" ~ "Peru",
+    country == "Brasil" ~ "Brazil",
+    country == "España" ~ "Spain",
+    country == "República Dominicana" ~ "Dominican Republic",
+    country == "Italia" ~ "Italy",
+    country == "Panamá" ~ "Panama",
+    country == "Trinidad y Tobago" ~ "Trinidad and Tobago",
+    country == "Costa Rica" ~ "Costa Rica",
+    country == "Portugal" ~ "Portugal",
+    country == "Canadá" ~ "Canada",
+    country == "Guyana" ~ "Guyana",
+    country == "Bolivia" ~ "Bolivia",
+    country == "Curaçao" ~ "Curacao",
+    country == "Aruba" ~ "Aruba",
+    country == "Francia" ~ "France",
+    country == "Paraguay" ~ "Paraguay",
+    country == "Guatemala" ~ "Guatemala",
+    country == "El Salvador" ~ "El Salvador",
+    country == "Nicaragua" ~ "Nicaragua",
+    country == "Honduras" ~ "Honduras",
+    country == "México" ~ "Mexico",
+    TRUE ~ country
+  ))
+
+# Cargar geometría
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+# Unir datos
+map_data <- world %>%
+  left_join(migracion, by = c("name" = "country"))
+
+# Paleta de color
+pal <- colorNumeric(
+  palette = colorRampPalette(c("#a8ddb5", "#43a2ca", "#084081"))(100),
+  domain = map_data$venezuela_migrantes,
+  na.color = "transparent"
+)
+
+# Mapa interactivo
+leaflet(map_data) %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  setView(lng = -60, lat = -15, zoom = 3) %>%
+  addPolygons(fillColor = ~pal(venezuela_migrantes),
+              weight = 1,
+              opacity = 1,
+              color = "white",
+              dashArray = "3",
+              fillOpacity = 0.8,
+              highlight = highlightOptions(
+                weight = 2,
+                color = "#222",
+                fillOpacity = 0.9,
+                bringToFront = TRUE),
+              label = ~paste0(
+                name, "<br>",
+                "Migrantes venezolanos: ",
+                ifelse(is.na(venezuela_migrantes), "Sin datos", format(venezuela_migrantes, big.mark = ","))
+              )) %>%
+  addLegend(pal = pal, values = ~venezuela_migrantes,
+            opacity = 0.7, title = "Migrantes venezolanos",
+            position = "bottomright")
+```
+    
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### **Tema de investigación**
+
+“Análisis de los factores que posicionaron al Perú como el segundo principal destino de migrantes venezolanos en América del Sur en 2018, pese a no compartir frontera directa con Venezuela.”
+
+### **Pregunta de investigación**
+
+¿Por qué en el 2018 el Perú se ha convertio en el segundo principal destino de migrantes venezolanos en América del Sur, a pesar de no compartir frontera directa con Venezuela?
+
+### **Justificación**
+
+La migración venezolana en Latinoamérica y Europa constituye uno de los fenómenos más relevantes de la última década. Mientras países fronterizos como Colombia, Brasil e islas caribeñas como Aruba enfrentaban flujos masivos (Vargas Ribas, 2018), Perú emergió como un caso paradigmático: sin compartir frontera con Venezuela, se convirtió en el segundo destino de esta diáspora, alcanzando 1.45 millones de venezolanos para el año 2022 (Vera Delzo, 2023). Este fenómeno desafía los patrones migratorios tradicionales centrados en la proximidad geográfica. En ese marco, el año 2018 se presenta como un punto de inflexión clave para el análisis: fue el periodo en el que coincidieron políticas migratorias excepcionalmente abiertas, como el Permiso Temporal de Permanencia (PTP), con un creciente deterioro de las condiciones en Venezuela, lo que facilitó la llegada masiva de migrantes. Según la ENPOVE (INEI, 2018), el 76,8 % de la población venezolana residente en Perú ingresó durante ese año, lo que convierte al 2018 en un caso representativo para comprender cómo factores institucionales y económicos superaron la barrera de la distancia geográfica e influyeron en la elección del Perú como destino prioritario.
+
+
+### **Hipótesis**
+
+El Perú ha sido elegido como destino principal por parte de los migrantes venezolanos debido a su estabilidad económica relativa en la región y a la implementación de políticas migratorias flexibles en el 2018, que facilitaron el ingreso y la regularización. Factores como la distancia geográfica, que usualmente representan una barrera, no habrían sido decisivos frente a la urgencia del éxodo y las oportunidades ofrecidas por el país andino.
+
+
+Variable Dependiente {data-icon="fa-table"}
+=====================================
+
+
+Row {data-width=650}
+-----------------------------------------------------------------------
+
+### **Número de migrantes**
+
+```{r}
+ggplot(migra, aes(x = reorder(pais, migrantes_venezolanos), y = migrantes_venezolanos)) +
+  geom_bar(
+    stat = "identity",
+    fill = "#084081",
+    color = "white",
+    width = 0.7
+  ) +
+  geom_text(
+    aes(label = comma(migrantes_venezolanos)),
+    hjust = -0.1,
+    size = 3.5,
+    color = "black"
+  ) +
+  labs(
+    title = "Migrantes venezolanos por país (2018)",
+    x = "",
+    y = "Número de migrantes",
+    caption = "Fuente: Datos recolectados para el estudio de migración venezolana"
+  ) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(color = "black", size = 10),
+    legend.position = "none"
+  )
+```
+
+Row {data-width=350}
+-----------------------------------------------------------------------
+
+### **Estadisticos**
+
+```{r}
+summary(migra$migrantes_venezolanos)
+```
+
+### **boxplot**
+
+```{r}
+ggplot(migra, aes(y = migrantes_venezolanos)) +
+  geom_boxplot(
+    fill = "#084081",
+    color = "black",
+    alpha = 0.7,
+    outlier.color = "#edc948",
+    outlier.size = 3
+  ) +
+  labs(
+    title = "Distribución de migrantes (Boxplot)",
+    y = "Número de migrantes"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(color = "black", size = 10),
+    legend.position = "none" )
+```
+
+Variables Independientes {data-icon="fa-table"}
+=====================================     
+
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### **Variable de Control: distancia_km**
+
+```{r}
+summary(migra$distancia_km)
+
+ggplot(migra, aes(x = reorder(pais, distancia_km), y = distancia_km)) +
+  geom_bar(
+    stat = "identity",
+    fill = "#084081",
+    color = "white",
+    width = 0.7
+  ) +
+  geom_text(
+    aes(label = comma(distancia_km)),
+    hjust = -0.1,
+    size = 3.5,
+    color = "black"
+  ) +
+  labs(
+    title = "Distancia Geográfica desde Venezuela a cada país",
+    x = "",
+    y = "KM",
+    caption = "Fuente: Datos recolectados para el estudio de migración venezolana"
+  ) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(color = "black", size = 10),
+    legend.position = "none"
+  )
+
+```
+
+Column {data-width=500} {.tabset}
+-----------------------------------------------------------------------
+
+### **Variable Independiete: Requiere visa**
+
+```{r}
+migra$requiere_visa <- factor(migra$requiere_visa, levels = c("NO", "SÍ"))
+
+summary(migra$requiere_visa)
+
+
+# Conteo de países
+ggplot(migra, aes(x = requiere_visa, fill = requiere_visa)) +
+  geom_bar() +
+  scale_fill_manual(values = c("NO" = "#084081", "SÍ" = "#a8ddb5")) +
+  labs(title = "Países que requieren visa para venezolanos (2018)",
+       x = "Requiere visa", y = "Número de países") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+### **Variable Independiete: Tasa de desempleo**
+
+```{r}
+summary(migra$tasa_desempleo)
+
+ggplot(migra, aes(x = tasa_desempleo)) +
+  geom_histogram(
+    bins = 10,
+    fill = "#084081",
+    color = "white",
+    alpha = 0.8
+  ) +
+  labs(
+    title = "Distribución de la tasa de desempleo (2018)",
+    x = "Tasa de desempleo (%)",
+    y = "Número de países"
+  ) +
+    theme_bw(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(color = "black", size = 10),
+    legend.position = "none"
+  )
+
+ggplot(migra, aes(x = reorder(pais, tasa_desempleo), y = tasa_desempleo)) +
+  geom_bar(
+    stat = "identity",
+    fill = "#084081",
+    color = "white",
+    width = 0.7
+  ) +
+  geom_text(
+    aes(label = comma(tasa_desempleo)),
+    hjust = -0.1,
+    size = 3.5,
+    color = "black"
+  ) +
+  labs(
+    title = "Tasa de desempleo por país (2018)",
+    x = "",
+    y = "Tasa de desempleo (%)",
+    caption = "Fuente: Datos recolectados para el estudio de migración venezolana"
+  ) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(color = "black", size = 10),
+    legend.position = "none"
+  )
+```
+
+### **Variable Independiete: Sueldo Mínimo**
+
+```{r}
+summary(migra$sueldo_minimo)
+
+
+ggplot(migra, aes(y = sueldo_minimo)) +
+  geom_boxplot(
+    fill = "#084081",
+    color = "black",
+    alpha = 0.7,
+    outlier.color = "#edc948",
+    outlier.size = 3
+  ) +
+  labs(
+    title = "Distribución del sueldo mínimo (Boxplot)",
+    y = "Cantidad de Sueldo mínimo"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(color = "black", size = 10),
+    legend.position = "none" )
+
+
+ggplot(migra, aes(x = reorder(pais, sueldo_minimo), y = sueldo_minimo)) +
+  geom_bar(
+    stat = "identity",
+    fill = "#084081",
+    color = "white",
+    width = 0.7
+  ) +
+  geom_text(
+    aes(label = comma(sueldo_minimo)),
+    hjust = -0.1,
+    size = 3.5,
+    color = "black"
+  ) +
+  labs(
+    title = "Sueldo mínimo por país (2018)",
+    x = "",
+    y = "Sueldo mensual",
+    caption = "Fuente: Datos recolectados para el estudio de migración venezolana"
+  ) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(color = "black", size = 10),
+    legend.position = "none"
+  )
+```
+
+###  **Variable Independiete: Inflación Anual (2018)**
+
+```{r}
+summary(migra$inflacion_anual)
+
+ggplot(migra, aes(x = inflacion_anual)) +
+  geom_histogram(
+    bins = 10,
+    fill = "#084081",
+    color = "white",
+    alpha = 0.8
+  ) +
+  labs(
+    title = "Distribución de la inflación anual (2018)",
+    x = "Inflación anual (%)",
+    y = "Número de países"
+  ) +
+ theme_bw(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(color = "black", size = 10),
+    legend.position = "none"
+  )
+
+
+
+ggplot(migra, aes(x = reorder(pais, inflacion_anual), y = inflacion_anual)) +
+  geom_bar(
+    stat = "identity",
+    fill = "#084081",
+    color = "white",
+    width = 0.7
+  ) +
+  geom_text(
+    aes(label = comma(inflacion_anual)),
+    hjust = -0.1,
+    size = 3.5,
+    color = "black"
+  ) +
+  labs(
+    title = "Inflación anual por país (2018)",
+    x = "",
+    y = "Porcentaje de la inlación",
+    caption = "Fuente: Datos recolectados para el estudio de migración venezolana"
+  ) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(color = "black", size = 10),
+    legend.position = "none"
+  )
+```
+
+
+### **Variable Independiete: tasa_informalidad (2018)**
+
+```{r}
+summary(migra$tasa_informalidad)
+
+ggplot(migra, aes(x = tasa_informalidad)) +
+  geom_histogram(
+    bins = 10,
+    fill = "#084081",
+    color = "white",
+    alpha = 0.8
+  ) +
+  labs(
+    title = "Distribución de la tasa informalidad(2018)",
+    x = "Tasa Informalidad (%)",
+    y = "Número de países"
+  ) +
+ theme_bw(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(color = "black", size = 10),
+    legend.position = "none"
+  )
+
+
+
+ggplot(migra, aes(x = reorder(pais, tasa_informalidad), y = tasa_informalidad)) +
+  geom_bar(
+    stat = "identity",
+    fill = "#084081",
+    color = "white",
+    width = 0.7
+  ) +
+  geom_text(
+    aes(label = comma(tasa_informalidad)),
+    hjust = -0.1,
+    size = 3.5,
+    color = "black"
+  ) +
+  labs(
+    title = "Tasa informalidad por país en comercio y transporte (2018)",
+    x = "",
+    y = "Porcentaje de la informalidad",
+    caption = "Fuente: Datos recolectados para el estudio de migración venezolana"
+  ) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(color = "black", size = 10),
+    legend.position = "none"
+  )
+```
+ 
+Regresión Poisson {data-icon="fa-table"}
+=====================================     
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### **Explicación Correlación**
+Los análisis muestran que los migrantes venezolanos presentan una ligera preferencia por países más cercanos (correlación -0.093), aunque con excepciones notables como Perú. Contrario a lo esperado, no evitan destinos con alto desempleo (correlación 0.081), probablemente por oportunidades en la economía informal. El salario mínimo formal muestra escasa influencia (correlación -0.140), al igual que la inflación (correlación -0.014). El factor más relevante es la informalidad laboral (correlación 0.127), sugiriendo que los migrantes priorizan mercados con fácil inserción laboral, aunque sea en condiciones precarias. Respecto al requisito de visa, los tests estadísticos (t de Student p=0.2588; Wilcoxon p=0.5635) indican que no afecta significativamente los volúmenes migratorios cuando se analiza de forma aislada. Estos hallazgos revelan que la diáspora venezolana valora especialmente la accesibilidad geográfica y las oportunidades laborales informales inmediatas, más que las condiciones económicas formales de los países receptores.
+
+### **Correlación entre VD y VI numéricas**
+```{r}
+#Correlación entre VD y VI numéricas
+
+
+colNums=names(migra)[c(7,2,4,5,6,8)]
+numXs=migra[,colNums]
+ggcorrplot(cor(numXs),lab = T,show.diag = F)
+
+
+#Correlación entre VD y VI categórica
+
+# 1. Análisis estadístico (solo para 'requiere_visa')
+t_test <- t.test(migrantes_venezolanos ~ requiere_visa, data = migra)
+wilcox_test <- wilcox.test(migrantes_venezolanos ~ requiere_visa, data = migra, exact = FALSE)
+
+# 2. Crear tabla de resultados
+tabla_resultados <- data.frame(
+  Variable = "requiere_visa",
+  Diferencia_Paramétrica = ifelse(t_test$p.value <= 0.05, "SÍ", "NO"),
+  Diferencia_No_Paramétrica = ifelse(wilcox_test$p.value <= 0.05, "SÍ", "NO"),
+  p_valor_t = round(t_test$p.value, 4),
+  p_valor_wilcoxon = round(wilcox_test$p.value, 4)
+)
+
+# 3. Formatear tabla con título descriptivo
+tabla_resultados %>%
+  kable(
+    caption = "Tabla 1.1: Diferencia en Migrantes Venezolanos (VD) por Requisito de Visa",
+    align = c("l", "c", "c", "c", "c"),
+    col.names = c("Variable", "Diferencia (t-test)", "Diferencia (Wilcoxon)",
+                  "p-valor (t)", "p-valor (Wilcoxon)")
+  ) %>%
+  kable_styling(
+    full_width = FALSE,
+    bootstrap_options = c("striped", "hover"),
+    font_size = 14
+  ) %>%
+  footnote(
+    general = "Umbral de significancia: p ≤ 0.05. Test de Wilcoxon con corrección para empates.",
+    general_title = "Nota:"
+  )
+
+
+corMatrix=polycor::hetcor(numXs)$correlations
+corMatrix
+```
+
+Column {data-width=500} {.tabset}
+-----------------------------------------------------------------------
+
+### **Regresión Poisson**
+
+Se estimaron cinco modelos Poisson anidados para explicar la migración venezolana.
+En el Modelo 1, con solo la tasa de desempleo, se encontró un efecto positivo y significativo: por cada punto que sube el desempleo, la migración aumenta en 0.023 unidades (coeficiente = 0.023, p < 0.001).
+
+En el Modelo 2, al agregar el sueldo mínimo, se ve que a mayor sueldo, la migración baja ligeramente (coeficiente = -0.002).
+En el Modelo 3, se incorpora la inflación anual, que también tiene un efecto negativo importante: cada punto de inflación reduce la migración en 0.043 unidades.
+
+En el Modelo 4, al agregar la variable requiere_visa, se observa que si un país pide visa, la migración disminuye significativamente: el coeficiente es -0.757, lo que indica una fuerte barrera de entrada.
+
+Finalmente, en el Modelo 5, se incluye la tasa de informalidad, que tiene un coeficiente positivo de 0.040, lo que sugiere que mientras más informalidad haya en el país destino, más migrantes llegan, probablemente por la facilidad de insertarse sin requisitos legales estrictos.
+
+Además, los indicadores del modelo mejoran a medida que se agregan variables: el AIC baja de 7.8 millones en el Modelo 1 a 5.5 millones en el Modelo 5, y el RMSE disminuye de 205,976 a 190,345, lo que confirma un mejor ajuste.
+
+```{r}
+#Regresión Poisson
+library(knitr)
+library(modelsummary)
+h1=formula(migrantes_venezolanos~tasa_desempleo)
+rp1=glm(h1, data = migra,
+        offset=log(distancia_km), #exposure
+        family = poisson(link = "log"))
+
+h2=formula(migrantes_venezolanos~tasa_desempleo+sueldo_minimo)
+rp2=glm(h2, data = migra,
+        offset=log(distancia_km), #exposure
+        family = poisson(link = "log"))
+
+h3=formula(migrantes_venezolanos~tasa_desempleo+sueldo_minimo+inflacion_anual)
+rp3=glm(h3, data = migra,
+        offset=log(distancia_km), #exposure
+        family = poisson(link = "log"))
+
+
+h4=formula(migrantes_venezolanos~tasa_desempleo+inflacion_anual+requiere_visa+tasa_informalidad+ sueldo_minimo)
+rp4=glm(h4, data = migra,
+        offset=log(distancia_km), #exposure
+        family = poisson(link = "log"))
+
+h5=formula(migrantes_venezolanos~tasa_desempleo+inflacion_anual+requiere_visa+tasa_informalidad)
+rp5=glm(h5, data = migra,
+        offset=log(distancia_km), #exposure
+        family = poisson(link = "log"))
+
+
+
+modelsPois=list('Modelo 1: Solo Desempleo'=rp1,
+                'Modelo 2: Desempleo + Sueldo'=rp2,
+                'Modelo 3: Desempleo + Sueldo +  Inflación Anual' = rp3,
+                 'Modelo 4: Desempleo + Sueldo +  Inflación Anual + requiere_visa' = rp4,
+                 'Modelo 5: Desempleo + Sueldo +  Inflación Anual +requiere_visa + tasa_informalidad' = rp5)
+
+modelsummary(modelsPois,
+             title = "Regresiones Poisson anidadas",
+             stars = TRUE,
+             output = "kableExtra")
+```
+
+### **Regresión Poisson - coeficientes exponenciados**
+Ahora, al ver los coeficientes exponenciados, podemos interpretar los efectos en términos más intuitivos.
+
+Por ejemplo, en todos los modelos, la tasa de desempleo tiene un efecto positivo y creciente sobre la migración.
+En el Modelo 1, un aumento de 1 punto en el desempleo implica que la migración aumenta en un 2.3% (coeficiente = 1.023).
+En el Modelo 5, ese efecto ya sube a 29.3% (1.2936), mostrando que, en presencia de otras variables, el desempleo se vuelve aún más determinante.
+
+En cuanto al sueldo mínimo, su coeficiente es menor a 1: por ejemplo, en el Modelo 3 es 0.9974, lo que implica que cuando el sueldo sube, la migración baja un 0.26% por cada unidad de aumento. Es un efecto leve, pero significativo.
+
+La inflación anual tiene también un efecto negativo: en el Modelo 5, su coeficiente es 0.9532, lo que indica que cada punto de inflación reduce la migración en aproximadamente 4.7%. Esto tiene sentido, ya que una economía más inestable desincentiva la llegada.
+
+Un dato clave es la variable requiere_visa:
+cuando un país exige visa, la probabilidad de que lleguen migrantes venezolanos se reduce a menos de la mitad.
+En el Modelo 4, el coeficiente es 0.4693, lo que significa una reducción del 53.1% en la migración con respecto a países que no piden visa.
+
+Por último, la tasa de informalidad tiene un efecto positivo:
+el coeficiente 1.0399 indica que por cada punto adicional de informalidad, la migración aumenta en 3.99%, lo que sugiere que los migrantes prefieren países donde pueden insertarse fácilmente sin muchos requisitos legales.
+```{r}
+formatoNum <- function(x) format(x, digits = 4, scientific = FALSE)
+
+modelsummary(modelsPois,
+             fmt=formatoNum, # uso mi formula
+             exponentiate = T, # exponenciar!!!!!
+             statistic = 'conf.int',
+             title = "Regresión Poisson - coeficientes exponenciados",
+             stars = TRUE,
+             output = "kableExtra")
+```
+
+### **Test de Equidispersión**
+
+```{r}
+overdispersion=AER::dispersiontest(rp5,alternative='greater')$ p.value<0.05
+underdispersion=AER::dispersiontest(rp5,alternative='less')$ p.value<0.05
+# tabla
+testResult=as.data.frame(rbind(overdispersion,underdispersion))
+names(testResult)='Es probable?'
+testResult%>%kable(caption = "Test de Equidispersión")%>%kableExtra::kable_styling()
+```
+
+### **Regresiones Poisson, Quasi Poisson y Binomial Negativa**
+Este estudio analiza los patrones migratorios de venezolanos, con especial atención a Perú como segundo destino principal. Los resultados muestran que los migrantes priorizan la facilidad de acceso sobre condiciones económicas ideales. La variable más determinante es el requisito de visa, que reduce aproximadamente un 70% el flujo migratorio. Aunque parezca contradictorio, mercados laborales con mayor desempleo e informalidad muestran capacidad de atracción (correlaciones positivas de 0.081 y 0.127 respectivamente), sugiriendo que los migrantes valoran más la rapidez para conseguir empleo que su calidad formal. La distancia geográfica muestra una influencia moderada (correlación -0.093), con preferencia por países cercanos, aunque con excepciones como Perú. Variables como salario mínimo e inflación resultaron poco relevantes.
+
+El modelo Binomial Negativa demostró ser el más adecuado, corrigiendo problemas técnicos del modelo Poisson inicial. Este revela que, tras controlar otros factores, la ausencia de visa sigue siendo el principal atractivo, mientras la informalidad laboral mantiene un efecto positivo aunque menos intenso (aumento del 1.8% en migración por cada punto porcentual de informalidad). Estos hallazgos explican por qué Perú, pese a indicadores económicos menos favorables, recibe tantos migrantes: combina acceso sin visa con una amplia economía informal que facilita la inserción laboral inmediata, aunque sea en condiciones precarias. En conclusión, la diáspora venezolana toma decisiones basadas en accesibilidad migratoria y oportunidades laborales inmediatas más que en condiciones económicas estructurales de los países receptores.
+```{r}
+
+#Regresion QUASIPOISSON
+rqp = glm(h5, data = migra,
+          offset=log(distancia_km),
+          family = quasipoisson(link = "log"))
+
+#BINOMIAL NEGATIVA
+h5off=formula(migrantes_venezolanos ~ tasa_desempleo + inflacion_anual + requiere_visa+ tasa_informalidad + offset(log(distancia_km)))
+
+rbn=glm.nb(h5off,data=migra)
+
+
+
+
+
+modelsQP_BN=list('Poisson migrantes venezolanos'=rp5,
+                 'QuasiPoisson migrantes venezolanos'=rqp,
+                 'Binomial Negativa migrantes venezolanos'=rbn)
+
+
+modelsummary(modelsQP_BN,fmt=formatoNum,
+             exponentiate = T,
+             statistic = 'conf.int',
+             title = "EXP() de la Regresiones Poisson, Quasi Poisson  y Binomial Negativa",
+             stars = TRUE,
+             output = "kableExtra")
+
+cor(migra[, c("tasa_informalidad", "sueldo_minimo", "tasa_desempleo")])
+
+```
+
+
+### **ANOVA y Likelihood Ratio Test**
+
+Los resultados muestran que el modelo Poisson tiene un ajuste muy pobre, con una desviación residual extremadamente alta (5,560,251) y una verosimilitud muy baja (-2,780,280), lo que indica que no captura bien los datos. En cambio, el modelo Binomial Negativa mejora drásticamente el ajuste, reduciendo la desviación residual a solo 35.52 y aumentando significativamente la verosimilitud (-320.95). El test de razón de verosimilitud confirma esta mejora con un Chi² enorme (5,559,919) y un valor-p de 0, lo que significa que la Binomial Negativa es estadísticamente superior. Al comparar los coeficientes estandarizados, vemos que Poisson subestima los efectos, mientras que Quasi-Poisson y Binomial Negativa dan estimaciones más realistas, especialmente para tasa_informalidad (el predictor más fuerte). En conclusión, la Binomial Negativa es el mejor modelo: corrige el sobreajuste del Poisson, ofrece coeficientes más confiables y tiene un soporte estadístico sólido. Se recomienda usarla y descartar el Poisson por su mal desempeño.
+```{r}
+#Comparación de modelos
+
+anova(rp5,rqp,rbn,test = "Chisq") %>%
+kable(caption = "Tabla ANOVA para comparar modelos")%>%kableExtra::kable_styling(full_width = FALSE)
+
+lmtest::lrtest(rp5,rbn)%>%
+kable(caption = "loglikelihood ratio test")%>%kableExtra::kable_styling(full_width = FALSE)
+
+
+
+migraEstandar <- migra %>%
+  mutate(
+    migrantes_miles = migrantes_venezolanos / 1000,  # Convertir a miles
+    inflacion_pct = inflacion_anual / 100            # Convertir a proporción (5% → 0.05)
+  )
+
+#COEFICIENTE STANDARIZADOS
+sdVD=sd(migraEstandar$migrantes_venezolanos)
+sdVIs=apply(migraEstandar[,c("requiere_visa","tasa_desempleo", "tasa_informalidad","inflacion_anual")],2,sd)
+DF=list(Poisson=sdVIs*coef(rp2)[c(2,3)]/sdVD,
+     CuasiPoisson=sdVIs*coef(rqp)[c(2,3)]/sdVD,
+     BinomNegativa=sdVIs*coef(rbn)[c(2,3)]/sdVD)%>%
+       data.frame()
+
+DF%>% kable(caption = "Coeficientes Standarizados (ordenar vía valores absolutos)")%>%
+          kableExtra::kable_styling(full_width = F)
+
+```
+
+Análisis de Datos {data-icon="fa-table"}
+===================================== 
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### **VIF**
+
+```{r}
+
+VIF(rp4) %>%kable(col.names = "VIF",caption ="Evaluando Multicolinealidad usando VIF (Variance Inflation Factors)" )%>%kable_styling(full_width = F)
+
+VIF(rp5) %>%kable(col.names = "VIF",caption ="Evaluando Multicolinealidad usando VIF (Variance Inflation Factors)" )%>%kable_styling(full_width = F)
+
+```
+
+Column {data-width=500} {.tabset}
+-----------------------------------------------------------------------
+
+### **Valores Influyentes**
+
+```{r}
+plot(rbn, 5)
+
+checkReg2=as.data.frame(influence.measures(rbn)$is.inf)
+checkReg2[checkReg2$cook.d & checkReg2$hat,c('cook.d','hat')]%>%kable(caption = "Valores Influyentes criticos")%>%kable_styling(full_width = F)
+```
+
+
+Clusterización {data-icon="fa-table"}
+=====================================     
+
+Column {data-width=500} {.tabset}
+-----------------------------------------------------------------------
+
+### **Método del Codo para PAM**
+```{r}
+#Clusterización:
+
+#Estrategia de Partición
+
+dataClus=migra[,c(2:8)]
+row.names(dataClus)=migra$pais
+
+library(cluster)
+g.dist = daisy(dataClus, metric="gower")
+
+# Datos de ejemplo (wss calculado previamente)
+wss <- sapply(1:10, function(k) {
+  pam_result <- pam(g.dist, k = k)
+  pam_result$objective[2]  # Suma de distancias intra-cluster
+})
+
+# Gráfico del codo con escala personalizada en el eje x
+ggplot(data.frame(k = 1:10, wss = wss), aes(k, wss)) +
+  geom_line(color = "#0D6EFD", linewidth = 1) +
+  geom_point(size = 3, color = "#E63946") +
+  scale_x_continuous(breaks = 1:10, labels = 1:10) +  # Fuerza incrementos de 1 en 1
+  labs(
+    title = "Método del Codo para PAM",
+    x = "Número de clusters (k)",
+    y = "Suma de distancias intra-cluster"
+  ) +
+  theme_minimal()
+```
+
+El método del codo identificó k=2 como el número óptimo de clusters. El análisis de los medoides reveló que el Cluster 1 agrupa países con alta migración venezolana (ej.: Perú, Colombia), alta informalidad laboral (75%) y políticas migratorias flexibles (0% requieren visa). En contraste, el Cluster 2 incluye países con baja migración, economías formales (informalidad <30%) y requisitos de visa (100%). El silhouette score (0.52) valida una estructura de clusters robusta. Esta dicotomía sugiere que los migrantes venezolanos priorizan destinos con acceso a empleo informal y sin barreras legales, incluso si no son fronterizos
+
+
+Column {data-width=500} {.tabset}
+-----------------------------------------------------------------------
+### **Método PAM**
+
+Lo ideal sería utilizar PAM como modelo principal para la asignación definitiva de clusters, pero complementar este análisis con los resultados de AGNES para tener una visión más completa de las relaciones jerárquicas en nuestros datos, especialmente para investigar esas dos observaciones donde los métodos difieren, ya que podrían revelar patrones o casos especiales de particular interés en nuestro conjunto de datos.
+
+```{r}
+library(cluster)
+library(factoextra)
+
+# Asumo que g.dist es tu matriz de distancias
+set.seed(123)
+res.pam <- pam(g.dist, 2, cluster.only = FALSE)
+
+# Añadir clusters al dataframe
+dataClus$pam <- res.pam$clustering
+
+# Visualización del silhouette
+fviz_silhouette(res.pam, print.summary = FALSE)
+```
+
+
+### **Método AGNES**
+
+```{r}
+
+res.agnes <- agnes(g.dist, method = "ward")
+fviz_dend(res.agnes, k = 2, cex = 0.6)
+
+# Cortar el dendrograma para obtener clusters
+dataClus$agnes <- cutree(res.agnes, k = 2)
+
+# Evaluar con silhouette
+sil_agnes <- silhouette(cutree(res.agnes, k = 2), g.dist)
+fviz_silhouette(sil_agnes, print.summary = FALSE)
+```
+
+### **Método DIANA**
+
+```{r}
+# Método DIANA
+res.diana <- diana(g.dist)
+fviz_dend(res.diana, k = 2, cex = 0.6)
+
+# Cortar el dendrograma
+dataClus$diana <- cutree(res.diana, k = 2)
+
+# Evaluar con silhouette
+sil_diana <- silhouette(cutree(res.diana, k = 2), g.dist)
+fviz_silhouette(sil_diana, print.summary = FALSE)
+```
+
+Column {data-width=500} {.tabset}
+-----------------------------------------------------------------------
+
+### **Clusters identificada por PAM**
+
+La proyección MDS confirma la estructura de clusters identificada por PAM. Perú se ubica junto a Colombia y Ecuador en la región izquierda (dim1 < 0), asociada a alta migración venezolana y informalidad laboral. Países como EEUU y España se agrupan en la derecha (dim1 > 0), caracterizados por economías formales y requisitos de visa. La dimensión vertical (dim2) separa a Trinidad y Tobago (cercanía geográfica) de Argentina (inflación extrema), revelando que factores espaciales y macroeconómicos también influyen en la distribución de los datos.
+
+```{r}
+proyeccion = cmdscale(g.dist, k=2,add = T)
+
+
+migra$dim1 <- proyeccion$points[,1]
+migra$dim2 <- proyeccion$points[,2]
+
+library(ggrepel)
+base= ggplot(migra,aes(x=dim1, y=dim2,label=row.names(dataClus)))
+base + geom_text_repel(size=3, max.overlaps = 50,min.segment.length = unit(0, 'lines'))
+```
+
+Factorización y conclusines {data-icon="fa-table"}
+===================================== 
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### **Factorización**
+
+```{r}
+#Factorización
+# Excluir columnas
+migra_filtered <- migra[, c(4,6,8)]
+
+# Calcular matriz de correlaciones policóricas
+corMatrix <- polycor::hetcor(migra_filtered)$correlations
+
+
+
+# Visualizar con ggcorrplot
+ggcorrplot(corMatrix)
+```
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### **Kaiser-Meyer-Olkin**
+
+El KMO bajo (0.44) sugiere que no es adecuado usar análisis factorial clásico, pero no invalida otros enfoques como:
+```{r}
+#No recomendable KMO Global = 0.44
+psych::KMO(corMatrix)
+```
+### **Conlusiones**
+Los resultados confirman que la migración venezolana en 2018 respondió a un cálculo entre accesibilidad institucional y flexibilidad laboral. La regresión binomial negativa (modelo óptimo tras corregir sobredispersión) reveló que el requisito de visa redujo el flujo migratorio en un 67.1% (IRR=0.329), mientras que la informalidad lo incrementó levemente (1.8%, IRR=1.0177), aunque con efectos no significativos al controlar por distancia. Esto explica el caso peruano: al eliminar la visa inicialmente y ofrecer un mercado laboral informal expansivo, el país atrajo migrantes pese a no ser fronterizo. Contrario a lo esperado, variables como el salario mínimo o la inflación mostraron efectos marginales, reforzando que los venezolanos priorizaron oportunidades inmediatas sobre condiciones económicas ideales. Estos hallazgos sugieren que las políticas migratorias deben equilibrar control fronterizo con mecanismos de integración laboral formal, evitando que la flexibilidad inicial derive en precariedad crónica. Futuras investigaciones deberían incorporar variables cualitativas (redes migratorias, percepción de seguridad) para capturar dimensiones omitidas en este análisis cuantitativo. 
+
+### **Aporte**
+A partir del análisis, se evidencia que el requerimiento de visa ha influido significativamente en la decisión de los ciudadanos venezolanos de ingresar por vías legales a los países receptores. En este sentido, se propone como política pública el diseño de mecanismos migratorios flexibles pero controlados, que permitan una migración regular, segura y ordenada, reconociendo la situación humanitaria de quienes migran, pero también el derecho de los Estados a regular sus fronteras. Esto implica, por ejemplo, visados humanitarios, permisos temporales de residencia o trabajo, y fortalecimiento de procesos de integración. Cada país puede decidir el nivel de apertura, pero se recomienda que estas políticas sean coherentes con los principios de derechos humanos y cooperación regional.
+
+
+
+
+
+
+
+
